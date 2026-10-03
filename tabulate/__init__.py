@@ -1389,8 +1389,8 @@ def _is_fixed_width_table_format(fmt):
         isinstance(fmt.datarow, DataRow)
         and bool(fmt.datarow.begin and fmt.datarow.end)
         and any(
-            isinstance(line, Line)
-            for line in (fmt.lineabove, fmt.linebelowheader, fmt.linebetweenrows, fmt.linebelow)
+            isinstance(line, Line) and bool(line.begin or line.end)
+            for line in (fmt.lineabove, fmt.linebetweenrows, fmt.linebelow)
         )
     )
 

@@ -2326,6 +2326,35 @@ def test_none_alignment_uses_custom_box_metadata():
     assert_equal("<=========>\n[     foo ]\n[ bar     ]\n<=========>", result)
 
 
+def test_none_alignment_orgtbl_remains_unpadded():
+    """A header separator alone does not turn a markup format into a box."""
+    assert_equal(
+        "|     foo |\n| bar |",
+        tabulate([["    foo"], ["bar"]], stralign=None, tablefmt="orgtbl"),
+    )
+    assert_equal(
+        "| h |\n|---------|\n|     foo |\n| bar |",
+        tabulate([["    foo"], ["bar"]], headers=["h"], stralign=None, tablefmt="orgtbl"),
+    )
+
+
+def test_none_alignment_custom_header_separator_is_not_a_box():
+    fmt = TableFormat(
+        lineabove=None,
+        linebelowheader=Line("", "-", "+", ""),
+        linebetweenrows=None,
+        linebelow=None,
+        headerrow=DataRow("|", "|", "|"),
+        datarow=DataRow("|", "|", "|"),
+        padding=1,
+        with_header_hide=None,
+    )
+    assert_equal(
+        "| h |\n---------\n|     foo |\n| bar |",
+        tabulate([["    foo"], ["bar"]], headers=["h"], stralign=None, tablefmt=fmt),
+    )
+
+
 def test_none_alignment_box_handles_multiline_separator_and_index():
     table = [["a\nb", "中"], SEPARATING_LINE, ["long", "x"]]
     result = tabulate(
