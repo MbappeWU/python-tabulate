@@ -2355,6 +2355,37 @@ def test_none_alignment_custom_header_separator_is_not_a_box():
     )
 
 
+def test_none_alignment_open_or_callable_frame_is_not_a_box():
+    open_frame = TableFormat(
+        lineabove=Line("<", "=", "+", ""),
+        linebelowheader=None,
+        linebetweenrows=None,
+        linebelow=None,
+        headerrow=DataRow("|", "|", "|"),
+        datarow=DataRow("|", "|", "|"),
+        padding=1,
+        with_header_hide=None,
+    )
+    callable_frame = TableFormat(
+        lineabove=lambda widths, aligns: "".join("-" for _ in widths),
+        linebelowheader=None,
+        linebetweenrows=None,
+        linebelow=None,
+        headerrow=DataRow("|", "|", "|"),
+        datarow=DataRow("|", "|", "|"),
+        padding=1,
+        with_header_hide=None,
+    )
+    for fmt, expected in (
+        (open_frame, "<=========\n|     foo |\n| bar |"),
+        (callable_frame, "-\n|     foo |\n| bar |"),
+    ):
+        assert_equal(
+            expected,
+            tabulate([["    foo"], ["bar"]], stralign=None, tablefmt=fmt),
+        )
+
+
 def test_none_alignment_box_handles_multiline_separator_and_index():
     table = [["a\nb", "中"], SEPARATING_LINE, ["long", "x"]]
     result = tabulate(
