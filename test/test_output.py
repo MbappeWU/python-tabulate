@@ -4,7 +4,15 @@ from decimal import Decimal
 
 from pytest import mark
 
-from tabulate import SEPARATING_LINE, simple_separated_format, tabulate
+from tabulate import (
+    SEPARATING_LINE,
+    DataRow,
+    Line,
+    TableFormat,
+    _visible_width,
+    simple_separated_format,
+    tabulate,
+)
 
 from common import assert_equal, check_warnings, raises, skip
 
@@ -2286,6 +2294,46 @@ def test_pretty_headerless():
     )
     result = tabulate(_test_table, tablefmt="pretty")
     assert_equal(expected, result)
+
+
+def test_none_alignment_preserves_content_and_box_geometry():
+    """None alignment keeps input whitespace while filling physical boxes."""
+    expected = "+---------+-------+\n| header  | title |\n+---------+-------+\n|     foo | title |\n| bar     | value |\n+---------+-------+"
+    result = tabulate(
+        [["    foo", "title"], ["bar", "value"]],
+        stralign=None,
+        headers=["header", "title"],
+        headersalign=[None, None],
+        tablefmt="pretty",
+    )
+    assert_equal(expected, result)
+    assert all(len(line) == 19 for line in result.splitlines())
+
+
+def test_none_alignment_uses_custom_box_metadata():
+    """A custom fixed format gets the same padding without a format-name check."""
+    fmt = TableFormat(
+        lineabove=Line("<", "=", "+", ">"),
+        linebelowheader=Line("<", "=", "+", ">"),
+        linebetweenrows=None,
+        linebelow=Line("<", "=", "+", ">"),
+        headerrow=DataRow("[", "][", "]"),
+        datarow=DataRow("[", "][", "]"),
+        padding=1,
+        with_header_hide=None,
+    )
+    result = tabulate([["    foo"], ["bar"]], stralign=None, tablefmt=fmt)
+    assert_equal("<=========>\n[     foo ]\n[ bar     ]\n<=========>", result)
+
+
+def test_none_alignment_box_handles_multiline_separator_and_index():
+    table = [["a\nb", "中"], SEPARATING_LINE, ["long", "x"]]
+    result = tabulate(
+        table, stralign=None, numalign=None, showindex=["i", "", "j"], tablefmt="grid"
+    )
+    lines = result.splitlines()
+    assert all(_visible_width(line) == _visible_width(lines[0]) for line in lines)
+    assert "a" in result and "b" in result and "中" in result
 
 
 def test_pretty_multiline_headerless():

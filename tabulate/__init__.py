@@ -1147,7 +1147,7 @@ def _choose_width_fn(has_invisible, enable_widechars, is_multiline):
     return width_fn
 
 
-def _align_column_choose_padfn(strings, alignment, has_invisible, preserve_whitespace):
+def _align_column_choose_padfn(strings, alignment, has_invisible, preserve_whitespace, pad_none):
     if alignment == "right":
         if not preserve_whitespace:
             strings = [s.strip() for s in strings]
@@ -1165,7 +1165,7 @@ def _align_column_choose_padfn(strings, alignment, has_invisible, preserve_white
         strings = [s + (maxdecimals - decs) * " " for s, decs in zip(strings, decimals)]
         padfn = _padleft
     elif not alignment:
-        padfn = _padnone
+        padfn = _padright if pad_none else _padnone
     else:
         if not preserve_whitespace:
             strings = [s.strip() for s in strings]
@@ -1212,10 +1212,11 @@ def _align_column(
     enable_widechars=False,
     is_multiline=False,
     preserve_whitespace=False,
+    pad_none=False,
 ):
     """[string] -> [padded_string]"""
     strings, padfn = _align_column_choose_padfn(
-        strings, alignment, has_invisible, preserve_whitespace
+        strings, alignment, has_invisible, preserve_whitespace, pad_none
     )
     width_fn = _align_column_choose_width_fn(has_invisible, enable_widechars, is_multiline)
 
@@ -1358,11 +1359,16 @@ def _format(val, valtype, floatfmt, intfmt, missingval="", has_invisible=True):
         return f"{val}"
 
 
-def _align_header(header, alignment, width, visible_width, is_multiline=False, width_fn=None):
+def _align_header(
+    header, alignment, width, visible_width, is_multiline=False, width_fn=None, pad_none=False
+):
     "Pad string header to width chars given known visible_width of the header."
     if is_multiline:
         header_lines = re.split(_multiline_codes, header)
-        padded_lines = [_align_header(h, alignment, width, width_fn(h)) for h in header_lines]
+        padded_lines = [
+            _align_header(h, alignment, width, width_fn(h), pad_none=pad_none)
+            for h in header_lines
+        ]
         return "\n".join(padded_lines)
     # else: not multiline
     ninvisible = len(header) - visible_width
@@ -1372,9 +1378,21 @@ def _align_header(header, alignment, width, visible_width, is_multiline=False, w
     elif alignment == "center":
         return _padboth(width, header)
     elif not alignment:
-        return f"{header}"
+        return _padright(width, header) if pad_none else f"{header}"
     else:
         return _padleft(width, header)
+
+
+def _is_fixed_width_table_format(fmt):
+    """Whether a format's row and line metadata describe a fixed text box."""
+    return (
+        isinstance(fmt.datarow, DataRow)
+        and bool(fmt.datarow.begin and fmt.datarow.end)
+        and any(
+            isinstance(line, Line)
+            for line in (fmt.lineabove, fmt.linebelowheader, fmt.linebetweenrows, fmt.linebelow)
+        )
+    )
 
 
 def _remove_separating_lines(rows):
@@ -2334,6 +2352,11 @@ def tabulate(
         is_multiline = True
     else:
         is_multiline = False
+    if isinstance(tablefmt, TableFormat):
+        format_metadata = tablefmt
+    else:
+        format_metadata = _table_formats.get(tablefmt, _table_formats["simple"])
+    pad_none = _is_fixed_width_table_format(format_metadata)
     width_fn = _choose_width_fn(has_invisible, enable_widechars, is_multiline)
 
     # format rows and columns, convert numeric values to strings
@@ -2400,6 +2423,7 @@ def tabulate(
             enable_widechars,
             is_multiline,
             preserve_whitespace,
+            pad_none,
         )
         for c, a, minw in zip(cols, aligns_copy, minwidths)
     ]
@@ -2435,7 +2459,7 @@ def tabulate(
             max(minw, max(width_fn(cl) for cl in c)) for minw, c in zip(minwidths, t_cols)
         ]
         headers = [
-            _align_header(h, a, minw, width_fn(h), is_multiline, width_fn)
+            _align_header(h, a, minw, width_fn(h), is_multiline, width_fn, pad_none)
             for h, a, minw in zip(headers, aligns_headers, minwidths)
         ]
         rows = list(zip(*cols))
@@ -2443,8 +2467,7 @@ def tabulate(
         minwidths = [max(width_fn(cl) for cl in c) for c in cols]
         rows = list(zip(*cols))
 
-    if not isinstance(tablefmt, TableFormat):
-        tablefmt = _table_formats.get(tablefmt, _table_formats["simple"])
+    tablefmt = format_metadata
 
     ra_default = rowalign if isinstance(rowalign, str) else None
     rowaligns = _expand_iterable(rowalign, len(rows), ra_default)
